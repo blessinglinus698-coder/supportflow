@@ -1,4 +1,12 @@
+import { LogOut } from "lucide-react";
+import { useProfile } from "../../context/ProfileContext";
+import { useAuth } from "../../context/AuthContext";
+import LiveClock from "./LiveClock";
+
 function Topbar() {
+  const { name, photoUrl } = useProfile();
+  const { logout } = useAuth();
+
   return (
     <header
       style={{
@@ -8,20 +16,20 @@ function Topbar() {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0 28px",
-        background: "#ffffff",
+        background: "var(--color-card)",
       }}
     >
-      <h1 style={{ fontSize: 19, fontWeight: 700, color: "var(--color-text)" }}>Dashboard</h1>
+      <LiveClock />
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <span style={{ fontSize: 14, color: "var(--color-text-muted)", fontWeight: 500 }}>
-          Agent: Blessing
+          Agent: {name}
         </span>
         <div
           style={{
             width: 34,
             height: 34,
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            background: photoUrl ? `url(${photoUrl}) center/cover` : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -30,8 +38,26 @@ function Topbar() {
             fontWeight: 700,
           }}
         >
-          B
+          {!photoUrl && name.charAt(0).toUpperCase()}
         </div>
+        <button
+          onClick={logout}
+          title="Log out"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-bg)",
+            color: "var(--color-text-muted)",
+            cursor: "pointer",
+          }}
+        >
+          <LogOut size={16} />
+        </button>
       </div>
     </header>
   );

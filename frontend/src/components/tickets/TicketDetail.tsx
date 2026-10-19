@@ -58,8 +58,9 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
           right: 0,
           height: "100vh",
           width: 400,
-          background: "#fff",
-          boxShadow: "-8px 0 30px rgba(0,0,0,0.15)",
+          background: "var(--color-card)",
+          borderLeft: "1px solid var(--color-border)",
+          boxShadow: "-8px 0 30px rgba(0,0,0,0.25)",
           zIndex: 50,
           padding: 26,
           overflowY: "auto",
@@ -111,6 +112,8 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
               fontSize: 13,
               fontFamily: "inherit",
               resize: "vertical",
+              background: "var(--color-bg)",
+              color: "var(--color-text)",
             }}
           />
           <button
@@ -118,7 +121,7 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
             disabled={saving}
             style={{
               marginTop: 8,
-              background: "var(--color-sidebar)",
+              background: "var(--gradient-brand)",
               color: "#fff",
               border: "none",
               padding: "9px 16px",
@@ -145,9 +148,9 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
-                background: "linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%)",
-                color: "var(--color-primary-dark)",
-                border: "1px solid #e0e7ff",
+                background: "var(--color-bg)",
+                color: "var(--color-primary)",
+                border: "1px solid var(--color-border)",
                 padding: "7px 12px",
                 borderRadius: 8,
                 fontSize: 12,
@@ -162,7 +165,16 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
           </div>
 
           {aiError && (
-            <p style={{ color: "#b91c1c", fontSize: 12, background: "#fef2f2", padding: 10, borderRadius: 8 }}>
+            <p
+              style={{
+                color: "#f87171",
+                fontSize: 12,
+                background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                padding: 10,
+                borderRadius: 8,
+              }}
+            >
               {aiError}
             </p>
           )}
@@ -170,7 +182,7 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
           {aiReply && (
             <div
               style={{
-                background: "#f8fafc",
+                background: "var(--color-bg)",
                 border: "1px solid var(--color-border)",
                 borderRadius: 10,
                 padding: 12,

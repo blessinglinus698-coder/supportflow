@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, Ticket, Users, Inbox, BookOpen, BarChart3, Settings } from "lucide-react";
-import Logo from "./logo";
+import { LayoutDashboard, Ticket, Users, Inbox, BookOpen, BarChart3, Settings as SettingsIcon, UserCog } from "lucide-react";
+import Logo from "./logo"
+import { useAuth } from "../../context/AuthContext";
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -9,10 +10,15 @@ const navItems = [
   { label: "Inbox", icon: Inbox, path: "/inbox" },
   { label: "Knowledge", icon: BookOpen, path: "/knowledge" },
   { label: "Analytics", icon: BarChart3, path: "/analytics" },
-  { label: "Settings", icon: Settings, path: "/settings" },
+  { label: "Onboarding", icon: UserCog, path: "/onboarding", adminOnly: true },
+  { label: "Settings", icon: SettingsIcon, path: "/settings" },
 ];
 
 function Sidebar() {
+  const { agent } = useAuth();
+  const isAdmin = agent?.role === "admin";
+  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+
   return (
     <aside
       style={{
@@ -28,7 +34,7 @@ function Sidebar() {
         <Logo />
       </div>
       <nav>
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

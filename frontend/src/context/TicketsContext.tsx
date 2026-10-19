@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { Ticket } from "../types/ticket";
+import { useAuth } from "./AuthContext";
 
 const API_URL = "http://localhost:5000/api/tickets";
 
@@ -14,21 +15,40 @@ interface TicketsContextValue {
 const TicketsContext = createContext<TicketsContextValue | undefined>(undefined);
 
 export function TicketsProvider({ children }: { children: ReactNode }) {
+  const { token, logout } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const authHeaders = useCallback(
+    (extra: Record<string, string> = {}) => ({ ...extra, Authorization: `Bearer ${token}` }),
+    [token]
+  );
+
   useEffect(() => {
-    fetch(API_URL)
-      .then((res) => res.json())
+    if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on logout
+      setTickets([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetch(API_URL, { headers: authHeaders() })
+      .then((res) => {
+        if (res.status === 401) {
+          logout();
+          return [];
+        }
+        return res.json();
+      })
       .then((data) => setTickets(data))
       .catch((err) => console.error("Failed to load tickets:", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [token, authHeaders, logout]);
 
   async function addTicket(ticket: Omit<Ticket, "id" | "status" | "updatedAt" | "notes">) {
     const res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(ticket),
     });
     const newTicket = await res.json();
@@ -38,17 +58,17 @@ export function TicketsProvider({ children }: { children: ReactNode }) {
   async function updateTicketNotes(id: string, notes: string) {
     const res = await fetch(`${API_URL}/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ notes }),
     });
     const updated = await res.json();
     setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
   }
 
-  
   async function suggestReply(id: string): Promise<string> {
     const res = await fetch(`${API_URL}/${id}/suggest-reply`, {
       method: "POST",
+      headers: authHeaders(),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -57,7 +77,6 @@ export function TicketsProvider({ children }: { children: ReactNode }) {
     return data.reply;
   }
 
-  
   return (
     <TicketsContext.Provider value={{ tickets, loading, addTicket, updateTicketNotes, suggestReply }}>
       {children}
