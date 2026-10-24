@@ -7,6 +7,7 @@ import { ProfileProvider } from "./context/ProfileContext";
 import { TicketsProvider } from "./context/TicketsContext";
 import { CustomersProvider } from "./context/CustomersContext";
 import { AgentsProvider } from "./context/AgentsContext";
+import { NotificationsProvider } from "./context/NotificationsContext";
 import App from "./App.tsx";
 import "./index.css";
 
@@ -19,7 +20,9 @@ createRoot(document.getElementById("root")!).render(
             <TicketsProvider>
               <CustomersProvider>
                 <AgentsProvider>
-                  <App />
+                  <NotificationsProvider>
+                    <App />
+                  </NotificationsProvider>
                 </AgentsProvider>
               </CustomersProvider>
             </TicketsProvider>

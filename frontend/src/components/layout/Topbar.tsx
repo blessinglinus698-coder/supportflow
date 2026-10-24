@@ -2,6 +2,7 @@ import { LogOut } from "lucide-react";
 import { useProfile } from "../../context/ProfileContext";
 import { useAuth } from "../../context/AuthContext";
 import LiveClock from "./LiveClock";
+import NotificationBell from "./NotificationBell";
 
 function Topbar() {
   const { name, photoUrl } = useProfile();
@@ -21,6 +22,7 @@ function Topbar() {
     >
       <LiveClock />
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <NotificationBell />
         <span style={{ fontSize: 14, color: "var(--color-text-muted)", fontWeight: 500 }}>
           Agent: {name}
         </span>

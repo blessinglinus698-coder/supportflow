@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useTickets } from "../context/TicketsContext";
 import { StatusBadge, PriorityBadge } from "../components/tickets/Badges";
 import TicketDetail from "../components/tickets/TicketDetail";
 import NewTicketModal from "../components/tickets/NewTicketModal";
-import type { Ticket, TicketStatus } from "../types/ticket";
+import type { TicketStatus } from "../types/ticket";
 
 const filters: (TicketStatus | "all")[] = ["all", "open", "pending", "resolved", "closed"];
 
@@ -12,8 +13,22 @@ function Tickets() {
   const { tickets, addTicket } = useTickets();
   const [activeFilter, setActiveFilter] = useState<TicketStatus | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lets a notification link (e.g. /tickets?ticketId=TCK-123) open that
+  // ticket's detail panel directly, then clears the param so it doesn't
+  // stick around once consumed.
+  useEffect(() => {
+    const ticketIdFromUrl = searchParams.get("ticketId");
+    if (ticketIdFromUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: open ticket linked from a notification
+      setSelectedTicketId(ticketIdFromUrl);
+      searchParams.delete("ticketId");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const filteredTickets = tickets.filter((t) => {
     const matchesStatus = activeFilter === "all" || t.status === activeFilter;
@@ -110,9 +125,9 @@ function Tickets() {
             {filteredTickets.map((t) => (
               <tr
                 key={t.id}
-                onClick={() => setSelectedTicket(t)}
+                onClick={() => setSelectedTicketId(t.id)}
                 style={{ borderTop: "1px solid var(--color-border)", cursor: "pointer" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(99,102,241,0.08)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <td style={{ padding: "12px 16px", color: "var(--color-text-muted)", fontSize: 13 }}>{t.id}</td>
@@ -133,7 +148,7 @@ function Tickets() {
         )}
       </div>
 
-      <TicketDetail ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
+      <TicketDetail ticketId={selectedTicketId} onClose={() => setSelectedTicketId(null)} />
 
       {showNewModal && (
         <NewTicketModal

@@ -37,8 +37,8 @@ function Customers() {
                 <tr
                   key={c.id}
                   style={{ borderTop: "1px solid var(--color-border)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(99,102,241,0.08)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")} 
                 >
                   <td style={{ padding: "12px 16px", fontWeight: 600, color: "var(--color-text)" }}>{c.name}</td>
                   <td style={{ padding: "12px 16px", color: "var(--color-text-muted)" }}>{c.email}</td>

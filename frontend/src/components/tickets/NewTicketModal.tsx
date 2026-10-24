@@ -1,3 +1,4 @@
+import { useAgents } from "../../context/AgentsContext"; 
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { Ticket, TicketPriority } from "../../types/ticket";
@@ -12,8 +13,9 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
   const [customer, setCustomer] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [assignedTo, setAssignedTo] = useState("Unassigned");
+  const { agents } = useAgents();
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) { 
     e.preventDefault();
     if (!subject.trim() || !customer.trim()) return;
 
@@ -71,11 +73,13 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
             <option value="urgent">Urgent</option>
           </select>
 
-          <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Assign to</label>
           <select style={inputStyle} value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
             <option>Unassigned</option>
-            <option>Blessing</option>
-            <option>Chidi</option>
+            {agents.map((a) => (
+              <option key={a.id} value={a.name}>
+                {a.name}
+              </option>
+            ))}
           </select>
 
           <button
@@ -98,7 +102,7 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
           </button>
         </form>
       </div>
-    </>
+    </> 
   );
 }
 

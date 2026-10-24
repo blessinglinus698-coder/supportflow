@@ -20,29 +20,33 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const API_URL = "http://localhost:5000/api/auth";
 
+// sessionStorage (not localStorage) is deliberate here: localStorage is shared
+// across every tab on this site, so logging in as a different account in one
+// tab would silently log out every other tab on refresh. sessionStorage is
+// scoped per tab, so each tab keeps its own independent session.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem("supportflow-token")
+    sessionStorage.getItem("supportflow-token")
   );
   const [agent, setAgent] = useState<AuthAgent | null>(() => {
-    const saved = localStorage.getItem("supportflow-agent");
+    const saved = sessionStorage.getItem("supportflow-agent");
     return saved ? JSON.parse(saved) : null;
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (token) {
-      localStorage.setItem("supportflow-token", token);
+      sessionStorage.setItem("supportflow-token", token);
     } else {
-      localStorage.removeItem("supportflow-token");
+      sessionStorage.removeItem("supportflow-token");
     }
   }, [token]);
 
   useEffect(() => {
     if (agent) {
-      localStorage.setItem("supportflow-agent", JSON.stringify(agent));
+      sessionStorage.setItem("supportflow-agent", JSON.stringify(agent));
     } else {
-      localStorage.removeItem("supportflow-agent");
+      sessionStorage.removeItem("supportflow-agent");
     }
   }, [agent]);
 

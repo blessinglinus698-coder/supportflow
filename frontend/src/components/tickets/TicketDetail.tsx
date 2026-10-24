@@ -1,18 +1,26 @@
 import { useState, useEffect } from "react";
 import { X, Sparkles } from "lucide-react";
-import type { Ticket } from "../../types/ticket";
-import { StatusBadge, PriorityBadge } from "./Badges";
+import type { TicketStatus, TicketPriority } from "../../types/ticket";
 import { useTickets } from "../../context/TicketsContext";
+import { useAgents } from "../../context/AgentsContext";
 
 interface TicketDetailProps {
-  ticket: Ticket | null;
+  ticketId: string | null;
   onClose: () => void;
 }
 
-function TicketDetail({ ticket, onClose }: TicketDetailProps) {
-  const { updateTicketNotes, suggestReply } = useTickets();
+function TicketDetail({ ticketId, onClose }: TicketDetailProps) {
+  const { tickets, updateTicketNotes, updateTicketStatus, updateTicketPriority, updateTicketAssignedTo, suggestReply } =
+    useTickets();
+  const { agents } = useAgents();
+  const ticket = tickets.find((t) => t.id === ticketId) || null;
+
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [prioritySaving, setPrioritySaving] = useState(false);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [aiReply, setAiReply] = useState("");
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState("");
@@ -21,14 +29,60 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
     setNotes(ticket?.notes || "");
     setAiReply("");
     setAiError("");
+    setActionError("");
   }, [ticket]);
 
   if (!ticket) return null;
 
   async function handleSaveNotes() {
     setSaving(true);
-    await updateTicketNotes(ticket!.id, notes);
-    setSaving(false);
+    setActionError("");
+    try {
+      await updateTicketNotes(ticket!.id, notes);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to save notes");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStatusChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newStatus = e.target.value as TicketStatus;
+    setStatusSaving(true);
+    setActionError("");
+    try {
+      await updateTicketStatus(ticket!.id, newStatus);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  async function handlePriorityChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newPriority = e.target.value as TicketPriority;
+    setPrioritySaving(true);
+    setActionError("");
+    try {
+      await updateTicketPriority(ticket!.id, newPriority);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update priority");
+    } finally {
+      setPrioritySaving(false);
+    }
+  }
+
+  async function handleAssignedToChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const newAssignedTo = e.target.value;
+    setAssignSaving(true);
+    setActionError("");
+    try {
+      await updateTicketAssignedTo(ticket!.id, newAssignedTo);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update assignment");
+    } finally {
+      setAssignSaving(false);
+    }
   }
 
   async function handleSuggestReply() {
@@ -44,6 +98,18 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
       setGenerating(false);
     }
   }
+
+  const selectStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid var(--color-border)",
+    fontSize: 12,
+    fontWeight: 600,
+    fontFamily: "inherit",
+    background: "var(--color-bg)",
+    color: "var(--color-text)",
+    cursor: "pointer",
+  };
 
   return (
     <>
@@ -75,9 +141,50 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
 
         <h2 style={{ fontSize: 19, fontWeight: 800, color: "var(--color-text)", marginBottom: 16 }}>{ticket.subject}</h2>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-          <StatusBadge status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
+        {actionError && (
+          <p
+            style={{
+              color: "#f87171",
+              fontSize: 12,
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              padding: 10,
+              borderRadius: 8,
+              marginBottom: 14,
+            }}
+          >
+            {actionError}
+          </p>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={ticket.priority}
+            onChange={handlePriorityChange}
+            disabled={prioritySaving}
+            style={{ ...selectStyle, opacity: prioritySaving ? 0.6 : 1 }}
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+
+          <select
+            value={ticket.status}
+            onChange={handleStatusChange}
+            disabled={statusSaving}
+            style={{ ...selectStyle, opacity: statusSaving ? 0.6 : 1 }}
+          >
+            <option value="open">Open</option>
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+
+          {(statusSaving || prioritySaving) && (
+            <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Saving...</span>
+          )}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
@@ -86,8 +193,34 @@ function TicketDetail({ ticket, onClose }: TicketDetailProps) {
             <p style={{ color: "var(--color-text)" }}>{ticket.customer}</p>
           </div>
           <div>
-            <p style={{ color: "var(--color-text-muted)", marginBottom: 2, fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>Assigned To</p>
-            <p style={{ color: "var(--color-text)" }}>{ticket.assignedTo}</p>
+            <p style={{ color: "var(--color-text-muted)", marginBottom: 4, fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>Assigned To</p>
+            <select
+              value={ticket.assignedTo}
+              onChange={handleAssignedToChange}
+              disabled={assignSaving}
+              style={{
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                fontSize: 13,
+                fontFamily: "inherit",
+                background: "var(--color-bg)",
+                color: "var(--color-text)",
+                cursor: assignSaving ? "default" : "pointer",
+                opacity: assignSaving ? 0.6 : 1,
+              }}
+            >
+              <option value="Unassigned">Unassigned</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.name}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {assignSaving && (
+              <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Saving...</span>
+            )}
           </div>
           <div>
             <p style={{ color: "var(--color-text-muted)", marginBottom: 2, fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>Last Updated</p>
