@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import type { Ticket, TicketStatus, TicketPriority } from "../types/ticket";
+import type { Ticket, TicketStatus, TicketPriority, NewTicketInput } from "../types/ticket";
 import { useAuth } from "./AuthContext";
 
 const API_URL = "http://localhost:5000/api/tickets";
@@ -7,7 +7,7 @@ const API_URL = "http://localhost:5000/api/tickets";
 interface TicketsContextValue {
   tickets: Ticket[];
   loading: boolean;
-  addTicket: (ticket: Omit<Ticket, "id" | "status" | "updatedAt" | "notes">) => Promise<void>;
+  addTicket: (ticket: NewTicketInput) => Promise<void>;
   updateTicketNotes: (id: string, notes: string) => Promise<void>;
   updateTicketStatus: (id: string, status: TicketStatus) => Promise<void>;
   updateTicketPriority: (id: string, priority: TicketPriority) => Promise<void>;
@@ -67,7 +67,7 @@ export function TicketsProvider({ children }: { children: ReactNode }) {
     return data;
   }
 
-  async function addTicket(ticket: Omit<Ticket, "id" | "status" | "updatedAt" | "notes">) {
+  async function addTicket(ticket: NewTicketInput) {
     const res = await fetch(API_URL, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),

@@ -1,18 +1,21 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "ocean";
+
+const THEMES: Theme[] = ["light", "dark", "ocean"];
 
 interface ThemeContextValue {
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem("supportflow-theme");
-    return saved === "dark" ? "dark" : "light";
+    return THEMES.includes(saved as Theme) ? (saved as Theme) : "light";
   });
 
   useEffect(() => {
@@ -20,12 +23,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("supportflow-theme", theme);
   }, [theme]);
 
+  function setTheme(next: Theme) {
+    setThemeState(next);
+  }
+
+  // Cycles light -> dark -> ocean -> light. Kept for any existing quick-toggle
+  // button elsewhere in the app; Settings now uses setTheme directly so each
+  // of the three options can be picked explicitly.
   function toggleTheme() {
-    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    setThemeState((prev) => {
+      const nextIndex = (THEMES.indexOf(prev) + 1) % THEMES.length;
+      return THEMES[nextIndex];
+    });
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

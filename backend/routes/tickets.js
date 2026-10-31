@@ -2,7 +2,8 @@ import { Router } from "express";
 import pool from "../db.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { notifyNewTicket, notifyTicketResolved, notifyTicketAssigned } from "../utils/notifications.js";
-import { isNonEmptyString, isOneOf } from "../utils/validation.js";
+import { sendMail } from "../utils/mailer.js";
+import { isNonEmptyString, isOneOf, isValidEmail } from "../utils/validation.js";
 
 const router = Router();
 
@@ -97,13 +98,16 @@ Write only the reply text, no greeting like "Dear customer" needed beyond a simp
 
 // POST a new ticket
 router.post("/", async (req, res) => {
-  const { subject, customer, priority, assignedTo } = req.body;
+  const { subject, customer, customerEmail, priority, assignedTo } = req.body;
 
   if (!isNonEmptyString(subject, { max: 200 })) {
     return res.status(400).json({ error: "Subject is required and must be 200 characters or fewer" });
   }
   if (!isNonEmptyString(customer, { max: 120 })) {
     return res.status(400).json({ error: "Customer is required and must be 120 characters or fewer" });
+  }
+  if (!isValidEmail(customerEmail)) {
+    return res.status(400).json({ error: "A valid customer email is required" });
   }
   if (priority !== undefined && !isOneOf(priority, PRIORITIES)) {
     return res.status(400).json({ error: `Priority must be one of: ${PRIORITIES.join(", ")}` });
@@ -113,19 +117,52 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    const trimmedEmail = customerEmail.trim();
+
+    // Find-or-create the customer by email — same pattern as the public
+    // contact form — so creating a ticket here never produces a duplicate
+    // customer record. If a match exists, its stored name is used on the
+    // ticket (not whatever the agent typed this time), so every ticket for
+    // this customer ends up under one consistent name.
+    const { rows: existingCustomerRows } = await pool.query("SELECT * FROM customers WHERE email = $1", [
+      trimmedEmail,
+    ]);
+    let customerRecord = existingCustomerRows[0];
+
+    if (!customerRecord) {
+      const customerId = `CUS-${Date.now()}`;
+      const joined = new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" });
+
+      await pool.query(
+        `INSERT INTO customers (id, name, email, company, "openTickets", "totalTickets", joined) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [customerId, customer.trim(), trimmedEmail, "", 0, 0, joined]
+      );
+      const { rows } = await pool.query("SELECT * FROM customers WHERE id = $1", [customerId]);
+      customerRecord = rows[0];
+    }
+
     const id = `TCK-${Date.now()}`;
     const status = "open";
     const updatedAt = new Date().toISOString();
 
     await pool.query(
-      `INSERT INTO tickets (id, subject, customer, status, priority, "assignedTo", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, subject.trim(), customer.trim(), status, priority || "medium", assignedTo || "Unassigned", updatedAt]
+      `INSERT INTO tickets (id, subject, customer, status, priority, "assignedTo", "updatedAt", "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        id,
+        subject.trim(),
+        customerRecord.name,
+        status,
+        priority || "medium",
+        assignedTo || "Unassigned",
+        updatedAt,
+        updatedAt,
+      ]
     );
 
     const { rows } = await pool.query("SELECT * FROM tickets WHERE id = $1", [id]);
     const newTicket = rows[0];
 
-    await adjustCustomerCounts(newTicket.customer, { totalDelta: 1, openDelta: 1 });
+    await adjustCustomerCounts(customerRecord.name, { totalDelta: 1, openDelta: 1 });
     await notifyNewTicket(newTicket);
     await notifyTicketAssigned(newTicket, "Unassigned");
 
@@ -165,10 +202,12 @@ router.patch("/:id", async (req, res) => {
     const newAssignedTo = assignedTo !== undefined ? assignedTo : ticket.assignedTo;
     const wasResolved = ticket.status === "resolved";
     const previousAssignedTo = ticket.assignedTo;
+    const justResolved = newStatus === "resolved" && !wasResolved;
+    const newResolvedAt = justResolved ? new Date().toISOString() : ticket.resolvedAt;
 
     await pool.query(
-      `UPDATE tickets SET status = $1, notes = $2, priority = $3, "assignedTo" = $4, "updatedAt" = $5 WHERE id = $6`,
-      [newStatus, newNotes, newPriority, newAssignedTo, new Date().toISOString(), id]
+      `UPDATE tickets SET status = $1, notes = $2, priority = $3, "assignedTo" = $4, "updatedAt" = $5, "resolvedAt" = $6 WHERE id = $7`,
+      [newStatus, newNotes, newPriority, newAssignedTo, new Date().toISOString(), newResolvedAt, id]
     );
 
     const { rows } = await pool.query("SELECT * FROM tickets WHERE id = $1", [id]);
@@ -196,6 +235,72 @@ router.patch("/:id", async (req, res) => {
   } catch (err) {
     console.error("Failed to update ticket:", err);
     res.status(500).json({ error: "Failed to update ticket" });
+  }
+});
+
+// GET the Inbox conversation thread for a ticket
+router.get("/:id/messages", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows: ticketRows } = await pool.query("SELECT * FROM tickets WHERE id = $1", [id]);
+    if (!ticketRows[0]) return res.status(404).json({ error: "Ticket not found" });
+
+    const { rows } = await pool.query(
+      `SELECT * FROM ticket_messages WHERE "ticketId" = $1 ORDER BY "createdAt" ASC`,
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("Failed to fetch ticket messages:", err);
+    res.status(500).json({ error: "Failed to load messages" });
+  }
+});
+
+// POST a reply from the Inbox — logs it in the thread and emails the
+// matched customer (best-effort: if no customer record/email is on file,
+// the reply still gets logged, it just isn't emailed anywhere).
+router.post("/:id/messages", async (req, res) => {
+  const { id } = req.params;
+  const { body } = req.body;
+
+  if (!isNonEmptyString(body, { max: 5000 })) {
+    return res.status(400).json({ error: "A message is required and must be 5000 characters or fewer" });
+  }
+
+  try {
+    const { rows: ticketRows } = await pool.query("SELECT * FROM tickets WHERE id = $1", [id]);
+    const ticket = ticketRows[0];
+    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+    const messageId = `MSG-${Date.now()}`;
+    const createdAt = new Date().toISOString();
+    const authorName = req.agent?.name || "Agent";
+    const trimmedBody = body.trim();
+
+    await pool.query(
+      `INSERT INTO ticket_messages (id, "ticketId", sender, "authorName", body, "createdAt") VALUES ($1, $2, $3, $4, $5, $6)`,
+      [messageId, id, "agent", authorName, trimmedBody, createdAt]
+    );
+
+    // Same best-effort name-match used everywhere else to link a ticket to
+    // a customer record (tickets have no formal foreign key to customers).
+    const { rows: customerRows } = await pool.query("SELECT * FROM customers WHERE name = $1", [
+      ticket.customer,
+    ]);
+    const customer = customerRows[0];
+    if (customer?.email) {
+      await sendMail({
+        to: customer.email,
+        subject: `Re: ${ticket.subject}`,
+        html: `<p>${trimmedBody.replace(/\n/g, "<br/>")}</p>`,
+      });
+    }
+
+    const { rows } = await pool.query("SELECT * FROM ticket_messages WHERE id = $1", [messageId]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("Failed to send reply:", err);
+    res.status(500).json({ error: "Failed to send reply" });
   }
 });
 

@@ -3,9 +3,9 @@
   --color-primary-dark: #4f46e5;
   --color-accent: #8b5cf6;
   --gradient-brand: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  --color-sidebar: #0f172a;
-  --color-sidebar-hover: #1e293b;
-  --color-sidebar-active: #312e81;
+  --color-sidebar: linear-gradient(180deg, #0f172a 0%, #131b31 100%);
+  --color-sidebar-border: rgba(255, 255, 255, 0.05);
+  --shadow-sidebar-active: 0 2px 8px rgba(99, 102, 241, 0.35);
   --color-bg: #f8fafc;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
@@ -24,9 +24,186 @@
   --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
 }
 
+/* Ocean Bed — a deep, luminous theme meant to feel like looking up through
+   dark water with faint bioluminescent light moving through it. Kept calm
+   on purpose: one slow drifting glow in the background, nothing flashing
+   or busy, so it stays comfortable to work in. */
+:root[data-theme="ocean"] {
+  --color-primary: #22d3ee;
+  --color-primary-dark: #0891b2;
+  --color-accent: #2dd4bf;
+  --gradient-brand: linear-gradient(135deg, #0ea5a4 0%, #22d3ee 55%, #38bdf8 100%);
+  /* A deep vertical gradient instead of a flat panel — lighter near the top
+     like surface light, fading to near-black toward the bottom, so the
+     sidebar reads as part of the same water rather than a flat UI slab. */
+  --color-sidebar: linear-gradient(180deg, #06232c 0%, #041620 55%, #020d12 100%);
+  --color-sidebar-border: rgba(45, 212, 191, 0.22);
+  --shadow-sidebar-active: 0 2px 14px rgba(34, 211, 238, 0.45);
+  /* Deliberately not fully opaque: every page background and card sits on
+     top of the living scene below (fish, seaweed, bubbles), so a sliver of
+     translucency lets it breathe through at the edges without ever touching
+     legibility — text contrast is unaffected at this opacity. */
+  --color-bg: rgba(4, 20, 28, 0.74);
+  --color-card: rgba(10, 31, 41, 0.82);
+  --color-border: rgba(45, 212, 191, 0.18);
+  --color-text: #e4fbf7;
+  --color-text-muted: #6fa89c;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 0 24px rgba(34,211,238,0.08);
+  --shadow-elevated: 0 8px 32px rgba(34,211,238,0.22);
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* The glow itself: three soft, overlapping radial lights that very slowly
+   drift and breathe. It's painted as the body's own background (not a
+   separate layered element), so it can never sit on top of the app or
+   interfere with clicks. */
+:root[data-theme="ocean"] body {
+  /* A solid, fully-opaque base of its own — independent of --color-bg,
+     which is deliberately translucent for descendant surfaces (see above).
+     Without this, the page would composite against the browser's default
+     white canvas instead of deep water. */
+  background-color: #04141c;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 20% 0%, rgba(34, 211, 238, 0.12), transparent 60%),
+    radial-gradient(ellipse 50% 50% at 85% 15%, rgba(45, 212, 191, 0.10), transparent 65%),
+    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(14, 165, 164, 0.12), transparent 70%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  animation: ocean-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes ocean-drift {
+  0% {
+    background-position: 0% 0%, 100% 0%, 50% 100%;
+    filter: brightness(1);
+  }
+  100% {
+    background-position: 3% 5%, 96% 7%, 52% 95%;
+    filter: brightness(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="ocean"] body {
+    animation: none;
+  }
+}
+
+/* ===== Ocean Bed — the living scene (fish, seaweed, bubbles) =====
+   Rendered by <OceanBackground />, mounted once behind the app layout.
+   Everything here is pointer-events: none and sits at a lower z-index than
+   the app content, so it's purely atmospheric — it can never block a click
+   or sit visually in front of real data. */
+
+.ocean-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* --- Fish: a body + an independently-flicking tail, drifting left to right
+   at a given depth (top offset), gently bobbing as it goes. --- */
+.ocean-fish {
+  position: absolute;
+  left: 0;
+  animation: ocean-swim linear infinite;
+  will-change: transform;
+}
+
+.ocean-fish__bob {
+  animation: ocean-bob ease-in-out infinite;
+}
+
+.ocean-fish__tail {
+  transform-origin: 100% 50%;
+  animation: ocean-tail-flick ease-in-out infinite;
+}
+
+@keyframes ocean-swim {
+  from {
+    transform: translateX(-15vw);
+  }
+  to {
+    transform: translateX(115vw);
+  }
+}
+
+@keyframes ocean-bob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ocean-tail-flick {
+  0%, 100% {
+    transform: rotate(-16deg);
+  }
+  50% {
+    transform: rotate(16deg);
+  }
+}
+
+/* --- Seaweed: anchored to the bottom edge, swaying at the base like it's
+   rooted in the seabed. --- */
+.ocean-seaweed {
+  position: absolute;
+  bottom: -4px;
+  transform-origin: 50% 100%;
+  animation: ocean-sway ease-in-out infinite;
+}
+
+@keyframes ocean-sway {
+  0%, 100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+/* --- Bubbles: rising and fading, like trapped air escaping the seabed. --- */
+.ocean-bubble {
+  position: absolute;
+  bottom: -5vh;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(224, 255, 250, 0.8), rgba(45, 212, 191, 0.15) 70%);
+  animation: ocean-bubble-rise linear infinite;
+}
+
+@keyframes ocean-bubble-rise {
+  0% {
+    transform: translateY(0) scale(0.7);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translateY(-115vh) scale(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-fish,
+  .ocean-fish__bob,
+  .ocean-fish__tail,
+  .ocean-seaweed,
+  .ocean-bubble {
+    animation: none;
+  }
 }

@@ -24,10 +24,10 @@ function Sidebar() {
       style={{
         width: 230,
         height: "100vh",
-        background: "linear-gradient(180deg, #0f172a 0%, #131b31 100%)",
+        background: "var(--color-sidebar)",
         color: "#fff",
         padding: "20px 14px",
-        borderRight: "1px solid rgba(255,255,255,0.05)",
+        borderRight: "1px solid var(--color-sidebar-border)",
       }}
     >
       <div style={{ marginBottom: 32 }}>
@@ -46,11 +46,9 @@ function Sidebar() {
                 gap: 10,
                 padding: "10px 12px",
                 borderRadius: 8,
-                color: isActive ? "#fff" : "#94a3b8",
-                background: isActive
-                  ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
-                  : "transparent",
-                boxShadow: isActive ? "0 2px 8px rgba(99,102,241,0.35)" : "none",
+                color: isActive ? "#fff" : "var(--color-text-muted)",
+                background: isActive ? "var(--gradient-brand)" : "transparent",
+                boxShadow: isActive ? "var(--shadow-sidebar-active)" : "none",
                 textDecoration: "none",
                 fontSize: 14,
                 fontWeight: isActive ? 600 : 500,

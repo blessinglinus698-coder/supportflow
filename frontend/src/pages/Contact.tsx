@@ -1,12 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+interface ContactFormConfig {
+  enabled: boolean;
+  title: string;
+  intro: string;
+  phoneMode: "required" | "optional" | "hidden";
+  emailMode: "required" | "optional";
+}
 
 function Contact() {
+  const [config, setConfig] = useState<ContactFormConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [feedback, setFeedback] = useState("");
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/public/contact-form-config")
+      .then((res) => res.json())
+      .then((data) => setConfig(data))
+      .catch((err) => console.error("Failed to load contact form config:", err))
+      .finally(() => setConfigLoading(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +67,59 @@ function Contact() {
     color: "var(--color-text)",
   };
 
+  if (configLoading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          background: "var(--color-bg)",
+        }}
+      >
+        <p style={{ color: "var(--color-text-muted)" }}>Loading...</p>
+      </div>
+    );
+  }
+
+  if (config && !config.enabled) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          background: "var(--color-bg)",
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            background: "var(--color-card)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 16,
+            padding: 32,
+            width: 420,
+            textAlign: "center",
+            boxShadow: "var(--shadow-card)",
+          }}
+        >
+          <h1 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)", marginBottom: 8 }}>
+            Form unavailable
+          </h1>
+          <p style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
+            This contact form isn't accepting submissions right now. Please check back later.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const phoneMode = config?.phoneMode || "optional";
+  const emailMode = config?.emailMode || "required";
+
   return (
     <div
       style={{
@@ -70,10 +142,10 @@ function Contact() {
         }}
       >
         <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--color-text)", marginBottom: 4 }}>
-          Contact Support
+          {config?.title || "Contact Support"}
         </h1>
         <p style={{ color: "var(--color-text-muted)", fontSize: 13, marginBottom: 20 }}>
-          Tell us what's going on and we'll get back to you.
+          {config?.intro || "Tell us what's going on and we'll get back to you."}
         </p>
 
         {status === "success" ? (
@@ -83,19 +155,30 @@ function Contact() {
             <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Name</label>
             <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} required />
 
-            <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Email</label>
+            <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>
+              Email {emailMode === "optional" ? "(optional)" : ""}
+            </label>
             <input
               type="email"
               style={inputStyle}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
+              required={emailMode === "required"}
             />
 
-            <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>
-              Phone (optional)
-            </label>
-            <input style={inputStyle} value={phone} onChange={(e) => setPhone(e.target.value)} />
+            {phoneMode !== "hidden" && (
+              <>
+                <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>
+                  Phone {phoneMode === "optional" ? "(optional)" : ""}
+                </label>
+                <input
+                  style={inputStyle}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required={phoneMode === "required"}
+                />
+              </>
+            )}
 
             <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Message</label>
             <textarea

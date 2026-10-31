@@ -8,6 +8,10 @@ interface CustomersContextValue {
   customers: Customer[];
   loading: boolean;
   addCustomer: (customer: Omit<Customer, "id" | "openTickets" | "totalTickets" | "joined">) => Promise<void>;
+  updateCustomer: (
+    id: string,
+    updates: Partial<Pick<Customer, "name" | "email" | "company">>
+  ) => Promise<void>;
 }
 
 const CustomersContext = createContext<CustomersContextValue | undefined>(undefined);
@@ -49,12 +53,30 @@ export function CustomersProvider({ children }: { children: ReactNode }) {
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(customer),
     });
-    const newCustomer = await res.json();
-    setCustomers((prev) => [newCustomer, ...prev]);
+    const data = await res.json();
+    if (!res.ok) {
+      // e.g. a 409 on a duplicate email — don't let the error object get
+      // written into state in place of a real customer.
+      throw new Error(data.error || "Failed to create customer");
+    }
+    setCustomers((prev) => [data, ...prev]);
+  }
+
+  async function updateCustomer(id: string, updates: Partial<Pick<Customer, "name" | "email" | "company">>) {
+    const res = await fetch(`${API_URL}/${id}`, {
+      method: "PATCH",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(updates),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to update customer");
+    }
+    setCustomers((prev) => prev.map((c) => (c.id === id ? data : c)));
   }
 
   return (
-    <CustomersContext.Provider value={{ customers, loading, addCustomer }}>
+    <CustomersContext.Provider value={{ customers, loading, addCustomer, updateCustomer }}>
       {children}
     </CustomersContext.Provider>
   );

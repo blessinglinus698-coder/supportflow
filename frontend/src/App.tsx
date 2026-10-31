@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import type { ReactNode } from "react";
 import Sidebar from "./components/layout/Sidebar";
 import Topbar from "./components/layout/Topbar";
+import OceanBackground from "./components/layout/OceanBackground";
 import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
 import Customers from "./pages/Customers";
@@ -19,13 +20,28 @@ import AdminRoute from "./components/AdminRoute";
 
 function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-      <Sidebar />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <Topbar />
-        <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
+    <>
+      {/* Sits behind everything below (z-index 0 vs. the layout's 1), and is
+          pointer-events: none, so it's purely decorative — it never blocks a
+          click or covers real data. Renders nothing unless the Ocean Bed
+          theme is active. */}
+      <OceanBackground />
+      <div
+        style={{
+          display: "flex",
+          height: "100vh",
+          overflow: "hidden",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <Sidebar />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Topbar />
+          <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

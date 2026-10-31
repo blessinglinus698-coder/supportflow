@@ -7,6 +7,8 @@ import agentsRouter from "./routes/agents.js";
 import authRouter from "./routes/auth.js";
 import publicRouter from "./routes/public.js";
 import notificationsRouter from "./routes/notifications.js";
+import settingsRouter from "./routes/settings.js";
+import analyticsRouter from "./routes/analytics.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { initDb } from "./db.js";
 
@@ -25,6 +27,8 @@ app.use("/api/tickets", requireAuth, ticketsRouter);
 app.use("/api/customers", requireAuth, customersRouter);
 app.use("/api/agents", requireAuth, agentsRouter);
 app.use("/api/notifications", requireAuth, notificationsRouter);
+app.use("/api/settings", requireAuth, settingsRouter);
+app.use("/api/analytics", requireAuth, analyticsRouter);
 
 app.get("/", (req, res) => {
   res.send("SupportFlow API is running.");

@@ -53,4 +53,56 @@ router.post("/", async (req, res) => {
   }
 });
 
+// PATCH update a customer (name, email, and/or company)
+router.patch("/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, email, company } = req.body;
+
+  if (name !== undefined && !isNonEmptyString(name, { max: 120 })) {
+    return res.status(400).json({ error: "Name must be 120 characters or fewer" });
+  }
+  if (email !== undefined && !isValidEmail(email)) {
+    return res.status(400).json({ error: "A valid email is required" });
+  }
+  if (company !== undefined && typeof company === "string" && company.length > 150) {
+    return res.status(400).json({ error: "Company must be 150 characters or fewer" });
+  }
+
+  try {
+    const { rows: existingRows } = await pool.query("SELECT * FROM customers WHERE id = $1", [id]);
+    const customer = existingRows[0];
+    if (!customer) return res.status(404).json({ error: "Customer not found" });
+
+    const newEmail = email !== undefined ? email.trim() : customer.email;
+
+    // Only re-check for a collision if the email is actually changing —
+    // and never against the customer's own existing row.
+    if (newEmail !== customer.email) {
+      const { rows: dupRows } = await pool.query("SELECT * FROM customers WHERE email = $1 AND id != $2", [
+        newEmail,
+        id,
+      ]);
+      if (dupRows[0]) {
+        return res.status(409).json({ error: "A customer with this email already exists" });
+      }
+    }
+
+    const newName = name !== undefined ? name.trim() : customer.name;
+    const newCompany = company !== undefined ? company.trim() : customer.company;
+
+    await pool.query(`UPDATE customers SET name = $1, email = $2, company = $3 WHERE id = $4`, [
+      newName,
+      newEmail,
+      newCompany,
+      id,
+    ]);
+
+    const { rows } = await pool.query("SELECT * FROM customers WHERE id = $1", [id]);
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("Failed to update customer:", err);
+    res.status(500).json({ error: "Failed to update customer" });
+  }
+});
+
 export default router;

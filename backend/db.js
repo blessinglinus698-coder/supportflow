@@ -22,6 +22,21 @@ export async function initDb() {
     )
   `);
 
+  // Migration: where a ticket came from (the built-in /contact page, or a
+  // named external source submitting through its API key)
+  await pool.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'SupportFlow Contact Page'`);
+
+  // Migration: "updatedAt" gets overwritten on every edit, so it can't be
+  // used to answer "when was this created" or "when was this resolved"
+  // once a ticket has been touched — Analytics needs both. "createdAt" is
+  // set once, at creation, and never changes; "resolvedAt" is set once,
+  // the moment a ticket's status first becomes "resolved".
+  await pool.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "createdAt" TEXT`);
+  await pool.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS "resolvedAt" TEXT`);
+  // Backfill for tickets that existed before this column did: "updatedAt"
+  // is the best approximation available for their creation time.
+  await pool.query(`UPDATE tickets SET "createdAt" = "updatedAt" WHERE "createdAt" IS NULL`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS customers (
       id TEXT PRIMARY KEY,
@@ -63,6 +78,52 @@ export async function initDb() {
       message TEXT NOT NULL,
       urgent BOOLEAN DEFAULT false,
       read BOOLEAN DEFAULT false,
+      "createdAt" TEXT NOT NULL
+    )
+  `);
+
+  // Single-row table holding the public contact form's configuration
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contact_form_settings (
+      id TEXT PRIMARY KEY,
+      enabled BOOLEAN DEFAULT true,
+      title TEXT DEFAULT 'Contact Support',
+      intro TEXT DEFAULT 'Tell us what''s going on and we''ll get back to you.',
+      "phoneMode" TEXT DEFAULT 'optional'
+    )
+  `);
+  // Migration: email requirement mode, added once admins needed to control it too
+  await pool.query(`ALTER TABLE contact_form_settings ADD COLUMN IF NOT EXISTS "emailMode" TEXT DEFAULT 'required'`);
+
+  await pool.query(
+    `INSERT INTO contact_form_settings (id, enabled, title, intro, "phoneMode", "emailMode")
+     VALUES ('default', true, 'Contact Support', 'Tell us what''s going on and we''ll get back to you.', 'optional', 'required')
+     ON CONFLICT (id) DO NOTHING`
+  );
+
+  // External sources (other websites/forms) allowed to submit into the
+  // public contact endpoint, each identified by its own API key
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS external_sources (
+      id TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      "apiKey" TEXT UNIQUE NOT NULL,
+      enabled BOOLEAN DEFAULT true,
+      "createdAt" TEXT NOT NULL
+    )
+  `);
+
+  // The Inbox's conversation thread for a ticket: the customer's original
+  // message (seeded when a ticket comes in through the public contact form)
+  // plus every agent reply sent from there. Kept separate from a ticket's
+  // "notes" field, which stays internal-only and is never emailed.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ticket_messages (
+      id TEXT PRIMARY KEY,
+      "ticketId" TEXT NOT NULL,
+      sender TEXT NOT NULL,
+      "authorName" TEXT,
+      body TEXT NOT NULL,
       "createdAt" TEXT NOT NULL
     )
   `);

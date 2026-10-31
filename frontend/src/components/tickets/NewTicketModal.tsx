@@ -1,26 +1,37 @@
-import { useAgents } from "../../context/AgentsContext"; 
+import { useAgents } from "../../context/AgentsContext";
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Ticket, TicketPriority } from "../../types/ticket";
+import type { NewTicketInput, TicketPriority } from "../../types/ticket";
 
 interface NewTicketModalProps {
   onClose: () => void;
-  onCreate: (ticket: Omit<Ticket, "id" | "status" | "updatedAt" | "notes">) => void;
+  onCreate: (ticket: NewTicketInput) => Promise<void>;
 }
 
 function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
   const [subject, setSubject] = useState("");
   const [customer, setCustomer] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [assignedTo, setAssignedTo] = useState("Unassigned");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const { agents } = useAgents();
 
-  function handleSubmit(e: React.FormEvent) { 
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!subject.trim() || !customer.trim()) return;
+    if (!subject.trim() || !customer.trim() || !customerEmail.trim()) return;
 
-    onCreate({ subject, customer, priority, assignedTo });
-    onClose();
+    setSaving(true);
+    setError("");
+    try {
+      await onCreate({ subject, customer, customerEmail, priority, assignedTo });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create ticket");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -32,6 +43,8 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
     marginTop: 4,
     marginBottom: 14,
     fontFamily: "inherit",
+    background: "var(--color-bg)",
+    color: "var(--color-text)",
   };
 
   return (
@@ -43,7 +56,8 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          background: "#fff",
+          background: "var(--color-card)",
+          border: "1px solid var(--color-border)",
           borderRadius: 16,
           padding: 26,
           width: 400,
@@ -53,17 +67,42 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-text)" }}>New Ticket</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)" }}>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)" }}
+          >
             <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Subject</label>
-          <input style={inputStyle} value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Can't log in" />
+          <input
+            style={inputStyle}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="e.g. Can't log in"
+          />
 
           <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Customer name</label>
-          <input style={inputStyle} value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="e.g. Jane Doe" />
+          <input
+            style={inputStyle}
+            value={customer}
+            onChange={(e) => setCustomer(e.target.value)}
+            placeholder="e.g. Jane Doe"
+          />
+
+          <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Customer email</label>
+          <input
+            type="email"
+            style={inputStyle}
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            placeholder="e.g. jane@company.com"
+          />
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: -10, marginBottom: 14 }}>
+            Matches an existing customer by email, or creates a new one.
+          </p>
 
           <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Priority</label>
           <select style={inputStyle} value={priority} onChange={(e) => setPriority(e.target.value as TicketPriority)}>
@@ -73,6 +112,7 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
             <option value="urgent">Urgent</option>
           </select>
 
+          <label style={{ fontSize: 13, color: "var(--color-text-muted)", fontWeight: 600 }}>Assigned to</label>
           <select style={inputStyle} value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
             <option>Unassigned</option>
             {agents.map((a) => (
@@ -82,8 +122,11 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
             ))}
           </select>
 
+          {error && <p style={{ fontSize: 13, color: "#ef4444", marginBottom: 10 }}>{error}</p>}
+
           <button
             type="submit"
+            disabled={saving}
             style={{
               width: "100%",
               background: "var(--gradient-brand)",
@@ -93,16 +136,17 @@ function NewTicketModal({ onClose, onCreate }: NewTicketModalProps) {
               borderRadius: 10,
               fontSize: 14,
               fontWeight: 700,
-              cursor: "pointer",
+              cursor: saving ? "default" : "pointer",
+              opacity: saving ? 0.6 : 1,
               marginTop: 6,
               boxShadow: "var(--shadow-elevated)",
             }}
           >
-            Create Ticket
+            {saving ? "Creating..." : "Create Ticket"}
           </button>
         </form>
       </div>
-    </> 
+    </>
   );
 }
 
